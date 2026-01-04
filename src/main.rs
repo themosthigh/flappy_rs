@@ -49,7 +49,7 @@ fn main() {
                 .set(ImagePlugin::default_nearest()),
         )
         .add_systems(Startup, setup_level)
-        .add_systems(Update, update_bird)
+        .add_systems(Update, (update_bird, update_obstacles))
         .run();
 }
 
@@ -98,6 +98,25 @@ fn update_bird(
     }
 }
 
+fn update_obstacles(
+    time: Res<Time>,
+    game_manager: Res<GameManager>,
+    mut obstacle_query: Query<(&mut Obstacle, &mut Transform)>,
+) {
+    let mut rand = rng();
+    let y_offset = generate_offset(&mut rand);
+    for (obstacle, mut transform) in obstacle_query.iter_mut() {
+        transform.translation.x -= time.delta_secs() * OBSTACLE_SCROLL_SPEED;
+
+        if transform.translation.x + OBSTACLE_WIDTH * PIXEL_RATIO / 2.
+            < -game_manager.window_dimenstions.x / 2.
+        {
+            transform.translation.x += OBSTACLE_AMOUNT as f32 * OBSTACLE_SPACING * PIXEL_RATIO;
+            transform.translation.y = get_centered_position() * obstacle.pipe_direction + y_offset;
+        }
+    }
+}
+
 fn spawn_obstacles(
     mut commands: &mut Commands,
     mut rand: &mut ThreadRng,
@@ -143,7 +162,7 @@ fn spawn_obstacle(
 }
 
 fn generate_offset(rand: &mut ThreadRng) -> f32 {
-    rand.gen_range(-OBSTACLE_VERTICAL_OFFSET..OBSTACLE_VERTICAL_OFFSET) * PIXEL_RATIO
+    rand.random_range(-OBSTACLE_VERTICAL_OFFSET..OBSTACLE_VERTICAL_OFFSET) * PIXEL_RATIO
 }
 
 fn get_centered_position() -> f32 {
