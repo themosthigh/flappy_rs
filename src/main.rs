@@ -81,9 +81,12 @@ fn setup_level(
 }
 
 fn update_bird(
-    mut bird_query: Query<(&mut Bird, &mut Transform)>,
+    mut commands: Commands,
+    mut bird_query: Query<(&mut Bird, &mut Transform), Without<Obstacle>>,
+    mut obstacle_query: Query<(&Transform, Entity), With<Obstacle>>,
     time: Res<Time>,
     keys: Res<ButtonInput<KeyCode>>,
+    game_manager: Res<GameManager>,
 ) {
     if let Ok((mut bird, mut transform)) = bird_query.single_mut() {
         if keys.just_pressed(KeyCode::Space) {
@@ -94,7 +97,40 @@ fn update_bird(
         transform.rotation = Quat::from_axis_angle(
             Vec3::Z,
             f32::clamp(bird.velocity / VELOCITY_TO_ROTATION_RATION, -90.0, 90.0).to_radians(),
-        )
+        );
+
+        let mut dead = false;
+        if transform.translation.y <= -game_manager.window_dimenstions.y / 2. {
+            dead = true;
+        } else {
+            for (pipe_transform, _entity) in obstacle_query.iter() {
+                if (pipe_transform.translation.y - transform.translation.y).abs()
+                    < OBSTACLE_HEIGHT * PIXEL_RATIO / 2.
+                    && (pipe_transform.translation.x - transform.translation.x).abs()
+                        < OBSTACLE_WIDTH * PIXEL_RATIO / 2.
+                {
+                    dead = true;
+                    break;
+                }
+            }
+        }
+
+        if dead {
+            transform.translation = Vec3::ZERO;
+            bird.velocity = 0.;
+
+            for (_pipe_transform, entity) in obstacle_query.iter_mut() {
+                commands.entity(entity).despawn();
+            }
+
+            let mut rand = rng();
+            spawn_obstacles(
+                &mut commands,
+                &mut rand,
+                game_manager.window_dimenstions.x,
+                &game_manager.pipe_image,
+            );
+        }
     }
 }
 
@@ -118,8 +154,8 @@ fn update_obstacles(
 }
 
 fn spawn_obstacles(
-    mut commands: &mut Commands,
-    mut rand: &mut ThreadRng,
+    commands: &mut Commands,
+    rand: &mut ThreadRng,
     window_width: f32,
     pipe_image: &Handle<Image>,
 ) {
