@@ -1,5 +1,10 @@
 use bevy::{prelude::*, window::WindowResolution};
 
+const PIXEL_RATIO: f32 = 4.0;
+const FLAP_FORCE: f32 = 500.0;
+const GRAVITY: f32 = 2000.0;
+const VELOCITY_TO_ROTATION_RATION: f32 = 7.5;
+
 fn main() {
     App::new()
         .add_plugins(
@@ -16,10 +21,9 @@ fn main() {
                 .set(ImagePlugin::default_nearest()),
         )
         .add_systems(Startup, setup_level)
+        .add_systems(Update, update_bird)
         .run();
 }
-
-const PIXEL_RATIO: f32 = 4.0;
 
 #[derive(Component)]
 struct Bird {
@@ -37,4 +41,22 @@ fn setup_level(mut commands: Commands, asset_server: Res<AssetServer>) {
         Transform::IDENTITY.with_scale(Vec3::splat(PIXEL_RATIO)),
         Bird { velocity: 0. },
     ));
+}
+
+fn update_bird(
+    mut bird_query: Query<(&mut Bird, &mut Transform)>,
+    time: Res<Time>,
+    keys: Res<ButtonInput<KeyCode>>,
+) {
+    if let Ok((mut bird, mut transform)) = bird_query.single_mut() {
+        if keys.just_pressed(KeyCode::Space) {
+            bird.velocity = FLAP_FORCE;
+        }
+        bird.velocity -= time.delta_secs() * GRAVITY;
+        transform.translation.y += bird.velocity * time.delta_secs();
+        transform.rotation = Quat::from_axis_angle(
+            Vec3::Z,
+            f32::clamp(bird.velocity / VELOCITY_TO_ROTATION_RATION, -90.0, 90.0).to_radians(),
+        )
+    }
 }
